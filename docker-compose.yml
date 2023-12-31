@@ -1,4 +1,4 @@
-version: "3.9"
+version: "2.2"
 
 volumes:
   influxdb_data: {}
@@ -13,7 +13,7 @@ networks:
 
 services:
   influxdb:
-    container_name: dsig-influx
+    container_name: tsapp-influx
     image: influxdb:${INFLUXDB_VERSION}
     networks:
       - influx
@@ -24,7 +24,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
-      start_period: 40s
+      # start_period: 40s
     restart: always
     env_file:
       - ./influxdb/influxdb.env
@@ -33,9 +33,9 @@ services:
       - ./influxdb/config.yml:/etc/influxdb2/config.yml
 
   telegraf:
-    container_name: dsig-telegraf
+    container_name: tsapp-telegraf
     image: telegraf:${TELEGRAF_VERSION}
-    profiles: ["telegraf"]
+    # profiles: ["telegraf"]
     networks:
       - influx
     ports:
@@ -49,9 +49,9 @@ services:
       - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
 
   postgres:
-    container_name: dsig-postgres
+    container_name: tsapp-postgres
     image: bitnami/postgresql:${POSTGRES_VERSION}
-    profiles: ["grafana"]
+    # profiles: ["grafana"]
     networks:
       - postgres
     restart: always
@@ -61,9 +61,9 @@ services:
       - postgres_data:/bitnami/postgresql
 
   grafana:
-    container_name: dsig-grafana
+    container_name: tsapp-grafana
     image: grafana/grafana-enterprise:${GRAFANA_VERSION}
-    profiles: ["grafana"]
+    # profiles: ["grafana"]
     networks:
       - postgres
       - influx
@@ -74,7 +74,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
-      start_period: 40s
+      # start_period: 40s
     restart: always
     depends_on:
       - postgres
