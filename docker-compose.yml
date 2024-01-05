@@ -85,3 +85,54 @@ services:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/etc/dashboards
+
+  web:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    networks:
+      - influx
+    restart: always
+    ports:
+     - "5001:5001"
+    depends_on:
+      - redis
+
+  worker:
+    build:
+      context: ./celery-queue
+      dockerfile: Dockerfile
+    networks:
+      - influx
+    entrypoint: celery
+    command: -A tasks worker -l info -E -B
+    environment:
+      CELERY_BROKER_URL: redis://redis
+      CELERY_RESULT_BACKEND: redis://redis
+    depends_on:
+      - redis
+    volumes: ['./celery-queue:/queue']
+
+  monitor:
+    build:
+      context: ./celery-queue
+      dockerfile: Dockerfile
+    networks:
+      - influx
+    ports:
+     - "5555:5555"
+    command:  ['celery', '-A', 'tasks', 'flower']
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      - redis
+      - worker
+    volumes: ['./celery-queue:/queue']
+    
+  redis:
+    image: redis:alpine
+    networks:
+      - influx
+    ports:
+      - "6379:6379"
