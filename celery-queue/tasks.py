@@ -88,7 +88,7 @@ def scrape_into_influxdb():
         print(ts)
         print(ts.timestamp())
 
-        timestamp = ts.timestamp()
+        # timestamp = ts.timestamp()
         # dt_object = datetime.datetime.fromtimestamp(timestamp, tz=timezone('Asia/Shanghai'))
         # print(dt_object.timestamp())
         # print(str(dt_object))
@@ -106,7 +106,7 @@ def scrape_into_influxdb():
              .field("low", low)
              .field("close", close)
              .field("volume", volume)
-             .time(int(timestamp), write_precision=WritePrecision.S))
+             .time(ts, write_precision=WritePrecision.S))
 
         write_api.write(bucket=bucket, org=org, record=p)
 
