@@ -13,6 +13,13 @@ async def add(param1: int, param2: int) -> str:
     return response
 
 
+@app.get("/trigger_scrape", response_class=HTMLResponse)
+async def add() -> str:
+    task = celery.send_task('tasks.trigger_scrape', args=[], kwargs={})
+    response = f"<a href='{app.url_path_for('check_task', task_id=task.id)}'>check status of {task.id} </a>"
+    return response
+
+
 @app.get("/check/{task_id}", response_class=HTMLResponse)
 async def check_task(task_id: str) -> str:
     res = celery.AsyncResult(task_id)

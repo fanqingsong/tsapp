@@ -18,6 +18,17 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 from Ashare.Ashare import *
 from Ashare.MyTT import *
 
+import smtplib
+from email.mime.text import MIMEText
+from email.utils import formataddr
+
+my_sender = os.environ.get('EMAIL_SENDER_ADDR')
+my_pass = os.environ.get('EMAIL_PASSWORD')
+my_user = os.environ.get('EMAIL_RECEIVER_ADDR')
+smtp_server = os.environ.get('EMAIL_SMTP_SERVER')
+smtp_port = os.environ.get('EMAIL_SMTP_PORT')
+
+
 
 token = "myadmintoken"
 org = "myorganization"
@@ -49,7 +60,9 @@ celery_beat_schedule = {
     "time_scheduler": {
         "task": "tasks.timer",
         # Run every second
-        "schedule": crontab(minute='*/1'),
+        # "schedule": crontab(minute='*/1', day_of_week='mon-fri'),
+        "schedule": crontab(minute=0, hour='*/2', day_of_week='mon-fri'),
+        # "schedule": crontab(minute=0, hour='*/3,8-17'),
     }
 }
 
@@ -64,6 +77,22 @@ celery.conf.update(
     beat_schedule=celery_beat_schedule,
 )
 
+def mail():
+    ret = True
+    try:
+        msg = MIMEText('this is just a test', 'plain', 'utf-8')
+        msg['From'] = formataddr(["tracy", my_sender])
+        msg['To'] = formataddr(["test", my_user])
+        msg['Subject'] = "test email"
+
+        server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+        server.login(my_sender, my_pass)
+        server.sendmail(my_sender, [my_user, ], msg.as_string())
+        server.quit()
+    except Exception:
+        ret = False
+    return ret
+
 def scrape_into_influxdb():
     """Define function to generate the sin wave."""
 
@@ -75,7 +104,7 @@ def scrape_into_influxdb():
 
     write_api = client.write_api(write_options=SYNCHRONOUS)
 
-    df = get_price('sh000001', frequency='1m', count=1000)
+    df = get_price('sh000001', frequency='1d', count=2000)
     print(df)
     # CLOSE = df.close.values
     # print(CLOSE)
@@ -101,6 +130,7 @@ def scrape_into_influxdb():
 
         p = (influxdb_client.Point("day_stock_data")
              .tag("stock_id", "sh000001")
+             .tag("frequency", "daily")
              .field("open", open)
              .field("high", high)
              .field("low", low)
@@ -117,6 +147,12 @@ def scrape_into_influxdb():
             print(record)
 
     client.close()
+
+    ret = mail()
+    if ret:
+        print("email sent succeeded")
+    else:
+        print("email set failed")
 
 
 @celery.task(name='tasks.timer')
@@ -141,3 +177,8 @@ def timer():
 def add(x: int, y: int) -> int:
     time.sleep(5)
     return x + y
+
+@celery.task(name='tasks.trigger_scrape')
+def trigger_scrape() -> None:
+    scrape_into_influxdb()
+

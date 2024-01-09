@@ -32,63 +32,63 @@ services:
       - influxdb_data:/var/lib/influxdb2
       - ./influxdb/config.yml:/etc/influxdb2/config.yml
 
-  telegraf:
-    container_name: tsapp-telegraf
-    image: telegraf:${TELEGRAF_VERSION}
-    # profiles: ["telegraf"]
-    networks:
-      - influx
-    ports:
-      - 8125:8125/udp
-    restart: always
-    depends_on:
-      - influxdb
-    env_file:
-      - ./telegraf/telegraf.env
-    volumes:
-      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+#  telegraf:
+#    container_name: tsapp-telegraf
+#    image: telegraf:${TELEGRAF_VERSION}
+#    # profiles: ["telegraf"]
+#    networks:
+#      - influx
+#    ports:
+#      - 8125:8125/udp
+#    restart: always
+#    depends_on:
+#      - influxdb
+#    env_file:
+#      - ./telegraf/telegraf.env
+#    volumes:
+#      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
 
-  postgres:
-    container_name: tsapp-postgres
-    image: bitnami/postgresql:${POSTGRES_VERSION}
-    # profiles: ["grafana"]
-    networks:
-      - postgres
-    restart: always
-    env_file:
-      - ./postgres/postgres.env
-    volumes:
-      - postgres_data:/bitnami/postgresql
+#  postgres:
+#    container_name: tsapp-postgres
+#    image: bitnami/postgresql:${POSTGRES_VERSION}
+#    # profiles: ["grafana"]
+#    networks:
+#      - postgres
+#    restart: always
+#    env_file:
+#      - ./postgres/postgres.env
+#    volumes:
+#      - postgres_data:/bitnami/postgresql
 
-  grafana:
-    container_name: tsapp-grafana
-    image: grafana/grafana-enterprise:${GRAFANA_VERSION}
-    # profiles: ["grafana"]
-    networks:
-      - postgres
-      - influx
-    ports:
-      - 3000:3000
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
-      interval: 10s
-      timeout: 10s
-      retries: 5
-      # start_period: 40s
-    restart: always
-    depends_on:
-      - postgres
-      - influxdb
-    env_file:
-      - ./grafana/grafana.env
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-      - ./grafana/dashboards:/etc/dashboards
+#  grafana:
+#    container_name: tsapp-grafana
+#    image: grafana/grafana-enterprise:${GRAFANA_VERSION}
+#    # profiles: ["grafana"]
+#    networks:
+#      - postgres
+#      - influx
+#    ports:
+#      - 3000:3000
+#    healthcheck:
+#      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+#      interval: 10s
+#      timeout: 10s
+#      retries: 5
+#      # start_period: 40s
+#    restart: always
+#    depends_on:
+#      - postgres
+#      - influxdb
+#    env_file:
+#      - ./grafana/grafana.env
+#    volumes:
+#      - grafana_data:/var/lib/grafana
+#      - ./grafana/provisioning:/etc/grafana/provisioning
+#      - ./grafana/dashboards:/etc/dashboards
 
-  web:
+  fastapi:
     build:
-      context: ./api
+      context: ./fastapi
       dockerfile: Dockerfile
     networks:
       - influx
@@ -98,25 +98,33 @@ services:
     depends_on:
       - redis
 
-  worker:
+  scraper:
     build:
-      context: ./celery-queue
+      context: ./scraper
       dockerfile: Dockerfile
     networks:
       - influx
+    restart: always
     entrypoint: celery
     command: -A tasks worker -l info -E -B
     environment:
       CELERY_BROKER_URL: redis://redis
       CELERY_RESULT_BACKEND: redis://redis
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+      EMAIL_SENDER_ADDR: ${EMAIL_SENDER_ADDR}
+      EMAIL_RECEIVER_ADDR: ${EMAIL_RECEIVER_ADDR}
+      EMAIL_SMTP_SERVER: ${EMAIL_SMTP_SERVER}
+      EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT}
     depends_on:
       - redis
-    volumes: ['./celery-queue:/queue']
+      - influxdb
+    volumes: ['./scraper:/queue']
 
   monitor:
     build:
-      context: ./celery-queue
+      context: ./scraper
       dockerfile: Dockerfile
+    restart: always
     networks:
       - influx
     ports:
@@ -127,12 +135,15 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/0
     depends_on:
       - redis
-      - worker
-    volumes: ['./celery-queue:/queue']
+      - scraper
+    volumes: ['./scraper:/queue']
     
   redis:
     image: redis:alpine
     networks:
       - influx
+    restart: always
     ports:
       - "6379:6379"
+
+
