@@ -98,6 +98,29 @@ services:
     depends_on:
       - redis
 
+  machine_learning:
+    build:
+      context: ./machine_learning
+      dockerfile: Dockerfile
+    networks:
+      - influx
+    restart: always
+#    entrypoint: celery
+#    command: -A tasks worker -l info -E -B
+    command: ['python3', 'run.py']
+    environment:
+      CELERY_BROKER_URL: redis://redis
+      CELERY_RESULT_BACKEND: redis://redis
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+      EMAIL_SENDER_ADDR: ${EMAIL_SENDER_ADDR}
+      EMAIL_RECEIVER_ADDR: ${EMAIL_RECEIVER_ADDR}
+      EMAIL_SMTP_SERVER: ${EMAIL_SMTP_SERVER}
+      EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT}
+    depends_on:
+      - redis
+      - influxdb
+    volumes: ['./machine_learning:/queue']
+
   scraper:
     build:
       context: ./scraper
