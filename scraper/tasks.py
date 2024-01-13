@@ -77,13 +77,13 @@ celery.conf.update(
     beat_schedule=celery_beat_schedule,
 )
 
-def mail():
+def mail(head :str = 'test', content :str = 'this is just a test'):
     ret = True
     try:
-        msg = MIMEText('this is just a test', 'plain', 'utf-8')
+        msg = MIMEText(content, 'html', 'utf-8')
         msg['From'] = formataddr(["tracy", my_sender])
         msg['To'] = formataddr(["test", my_user])
-        msg['Subject'] = "test email"
+        msg['Subject'] = head
 
         server = smtplib.SMTP_SSL(smtp_server, smtp_port)
         server.login(my_sender, my_pass)
@@ -148,11 +148,44 @@ def scrape_into_influxdb():
 
     client.close()
 
-    ret = mail()
+    ret = mail("scrape over", "hooray")
     if ret:
         print("email sent succeeded")
     else:
         print("email set failed")
+
+def watch_recent_trend():
+
+    client = InfluxDBClient(url="http://influxdb:8086", token=token, org=org)
+
+    version = client.ping()
+    print(version)
+
+    query = '''
+        from(bucket: "stockdata") 
+            |> range(start: -7d)
+            |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+            |> yield()
+        '''
+    df = client.query_api().query_data_frame(query, org=org)
+
+    print("---- df -------")
+    print(df.columns)
+    print(df)
+
+    df['close_prev_one'] = df['close'].shift(1)
+    df['volume_prev_one'] = df['volume'].shift(1)
+
+    df['close_change'] = df['close'] - df['close_prev_one']
+    df['volume_change'] = df['volume'] - df['volume_prev_one']
+
+
+    ret = mail("Change for Latest 7 Days.", df.to_html())
+    if ret:
+        print("email sent succeeded")
+    else:
+        print("email set failed")
+
 
 
 @celery.task(name='tasks.timer')
@@ -172,6 +205,8 @@ def timer():
     logger.critical("second")
     logger.critical("222222222222")
 
+    watch_recent_trend()
+
 
 @celery.task(name='tasks.add')
 def add(x: int, y: int) -> int:
@@ -181,4 +216,7 @@ def add(x: int, y: int) -> int:
 @celery.task(name='tasks.trigger_scrape')
 def trigger_scrape() -> None:
     scrape_into_influxdb()
+
+    watch_recent_trend()
+
 
