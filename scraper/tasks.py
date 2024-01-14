@@ -61,7 +61,8 @@ celery_beat_schedule = {
         "task": "tasks.timer",
         # Run every second
         # "schedule": crontab(minute='*/1', day_of_week='mon-fri'),
-        "schedule": crontab(minute=0, hour='*/2', day_of_week='mon-fri'),
+        # "schedule": crontab(minute=0, hour='*/2', day_of_week='mon-fri'),
+        "schedule": crontab(minute=0, hour='9,13,16,21'),
         # "schedule": crontab(minute=0, hour='*/3,8-17'),
     }
 }
@@ -81,8 +82,8 @@ def mail(head :str = 'test', content :str = 'this is just a test'):
     ret = True
     try:
         msg = MIMEText(content, 'html', 'utf-8')
-        msg['From'] = formataddr(["tracy", my_sender])
-        msg['To'] = formataddr(["test", my_user])
+        msg['From'] = formataddr(["tsapp", my_sender])
+        msg['To'] = formataddr(["tsapp", my_user])
         msg['Subject'] = head
 
         server = smtplib.SMTP_SSL(smtp_server, smtp_port)
@@ -179,6 +180,8 @@ def watch_recent_trend():
     df['close_change'] = df['close'] - df['close_prev_one']
     df['volume_change'] = df['volume'] - df['volume_prev_one']
 
+    df = df[['_time', 'close_change', 'volume_change']]
+    df.set_index('_time')
 
     ret = mail("Change for Latest 7 Days.", df.to_html())
     if ret:
