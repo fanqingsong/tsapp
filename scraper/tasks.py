@@ -141,6 +141,42 @@ def scrape_into_influxdb():
 
         write_api.write(bucket=bucket, org=org, record=p)
 
+    df = get_price('sz399001', frequency='1d', count=2000)
+    print(df)
+    # CLOSE = df.close.values
+    # print(CLOSE)
+
+    for index, row in df.iterrows():
+        print(row)
+
+        ts: datetime.datetime = index
+        print("------")
+        print(ts)
+        print(ts.timestamp())
+
+        # timestamp = ts.timestamp()
+        # dt_object = datetime.datetime.fromtimestamp(timestamp, tz=timezone('Asia/Shanghai'))
+        # print(dt_object.timestamp())
+        # print(str(dt_object))
+
+        open = row['open']
+        high = row['high']
+        low = row['low']
+        close = row['close']
+        volume = row['volume']
+
+        p = (influxdb_client.Point("day_stock_data")
+             .tag("stock_id", "sz399001")
+             .tag("frequency", "daily")
+             .field("open", open)
+             .field("high", high)
+             .field("low", low)
+             .field("close", close)
+             .field("volume", volume)
+             .time(ts, write_precision=WritePrecision.S))
+
+        write_api.write(bucket=bucket, org=org, record=p)
+
     query = 'from(bucket: "stockdata") |> range(start: -7d)'
     tables = client.query_api().query(query, org=org)
     for table in tables:
@@ -165,6 +201,7 @@ def watch_recent_trend():
     query = '''
         from(bucket: "stockdata") 
             |> range(start: -7d)
+            |> filter(fn: (r) => r["stock_id"] == "sh000001")
             |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
             |> yield()
         '''
@@ -183,12 +220,39 @@ def watch_recent_trend():
     df = df[['_time', 'close_change', 'volume_change']]
     df.set_index('_time')
 
-    ret = mail("Change for Latest 7 Days.", df.to_html())
+    ret = mail("Change for Latest 7 Days SH.", df.to_html())
     if ret:
         print("email sent succeeded")
     else:
         print("email set failed")
 
+    query = '''
+        from(bucket: "stockdata") 
+            |> range(start: -7d)
+            |> filter(fn: (r) => r["stock_id"] == "sz399001")
+            |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+            |> yield()
+        '''
+    df = client.query_api().query_data_frame(query, org=org)
+
+    print("---- df -------")
+    print(df.columns)
+    print(df)
+
+    df['close_prev_one'] = df['close'].shift(1)
+    df['volume_prev_one'] = df['volume'].shift(1)
+
+    df['close_change'] = df['close'] - df['close_prev_one']
+    df['volume_change'] = df['volume'] - df['volume_prev_one']
+
+    df = df[['_time', 'close_change', 'volume_change']]
+    df.set_index('_time')
+
+    ret = mail("Change for Latest 7 Days SZ.", df.to_html())
+    if ret:
+        print("email sent succeeded")
+    else:
+        print("email set failed")
 
 
 @celery.task(name='tasks.timer')

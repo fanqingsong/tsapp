@@ -7,6 +7,9 @@ from  Ashare import *
 df=get_price('sh000001',frequency='1d',count=5)      #默认获取今天往前5天的日线行情
 print('上证指数日线行情\n',df)
 
+df=get_price('sz399001',frequency='1d',count=5)      #默认获取今天往前5天的日线行情
+print('sz证指数日线行情\n',df)
+
 df=get_price('000001.XSHG',frequency='1d',count=5,end_date='2021-04-30')   #可以指定结束日期，获取历史行情
 print('上证指数历史行情\n',df)
     

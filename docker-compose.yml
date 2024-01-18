@@ -13,7 +13,6 @@ networks:
 
 services:
   influxdb:
-    container_name: tsapp-influx
     image: influxdb:${INFLUXDB_VERSION}
     networks:
       - influx
@@ -143,7 +142,7 @@ services:
       - influxdb
     volumes: ['./scraper:/queue']
 
-  monitor:
+  flower:
     build:
       context: ./scraper
       dockerfile: Dockerfile
